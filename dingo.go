@@ -16,8 +16,10 @@ import "net/http"
 import "net/url"
 import "time"
 import "io/ioutil"
-//import "crypto/tls"
 import "encoding/json"
+import "crypto/tls"
+
+/**********************************************************************/
 
 /* command-line arguments */
 var (
@@ -27,104 +29,142 @@ var (
 	server  = flag.String("server", "https://dns.google.com", "server IP address")
 )
 
+/**********************************************************************/
+
 /* logging stuff */
 func dbg(lvl int, fmt string, v ...interface{}) { if (*dbglvl >= lvl) { dbglog.Printf(fmt, v...) } }
 func die(msg error) { dbglog.Fatalln("fatal error:", msg.Error()) }
 var dbglog = log.New(os.Stderr, "", log.LstdFlags | log.Lshortfile | log.LUTC)
 
+/* structures */
+type GRR struct {
+	Name   string
+	Type   uint16
+	TTL    uint32
+	Data   string
+}
+type Reply struct {
+	Status int
+	TC     bool
+	RD     bool
+	RA     bool
+	AD     bool
+	CD     bool
+	Question   []GRR
+	Answer     []GRR
+	Additional []GRR
+	Authority  []GRR
+	Comment    string
+}
+
 /* global channels */
-type Query struct { query *dns.Msg; rchan *chan Reply }
-type Reply struct { query *dns.Msg; reply *dns.Msg }
+type Query struct { Name string; Type int; rchan *chan Reply }
 var qchan = make(chan Query, 100)
+
+/**********************************************************************/
 
 /* UDP request handler */
 func handle(buf []byte, addr *net.UDPAddr, uc *net.UDPConn) {
-	dbg(2, "new request from %s (%d bytes)", addr, len(buf))
+	dbg(3, "new request from %s (%d bytes)", addr, len(buf))
 
 	/* try unpacking */
 	msg := new(dns.Msg)
-	err := msg.Unpack(buf)
-	if (err != nil) { dbg(2, "msg.Unpack failed: %s", err); return }
+	if err := msg.Unpack(buf); err != nil { dbg(3, "Unpack failed: %s", err); return }
 	dbg(7, "unpacked: %s", msg)
 
 	/* for each question */
-	if (len(msg.Question) < 1) { dbg(2, "no questions"); return }
-	for i,q := range msg.Question {
-		dbg(3, "  [%d] type=%d class=%d name=%s", i, q.Qtype, q.Qclass, q.Name)
-	}
+	if (len(msg.Question) < 1) { dbg(3, "no questions"); return }
 
 	/* TODO: check cache */
 
 	/* pass to resolvers and block until the response comes */
-	rchan := make(chan Reply, 1)
-	qchan <- Query{msg, &rchan}
-	rs := <-rchan
+	r := resolve(msg.Question[0].Name, int(msg.Question[0].Qtype))
+	dbg(8, "got reply: %+v", r)
 
-	/* TODO: check for empty answers */
+	/* rewrite the answers in r */
+	rmsg := new(dns.Msg)
+	rmsg.SetReply(msg)
+	rmsg.Compress = true
+	if (r.Status >= 0) {
+		rmsg.Rcode = r.Status
+		rmsg.Truncated = r.TC
+		rmsg.RecursionDesired = r.RD
+		rmsg.RecursionAvailable = r.RA
+		rmsg.AuthenticatedData = r.AD
+		rmsg.CheckingDisabled = r.CD
 
-	/* TODO: check for packing errors? */
-	rbuf,_ := rs.reply.Pack()
+		for _,grr := range r.Answer { rmsg.Answer = append(rmsg.Answer, getrr(grr)) }
+		for _,grr := range r.Authority { rmsg.Ns = append(rmsg.Ns, getrr(grr)) }
+		for _,grr := range r.Additional { rmsg.Extra = append(rmsg.Extra, getrr(grr)) }
+	} else {
+		rmsg.Rcode = 2 // SERVFAIL
+	}
+
+	dbg(8, "sending %s", rmsg.String())
+//	rmsg.Truncated = true
+
+	/* pack and send! */
+	rbuf,err := rmsg.Pack()
+	if (err != nil) { dbg(2, "Pack() failed: %s", err); return }
 	uc.WriteToUDP(rbuf, addr)
 }
 
+/* convert Google RR to miekg/dns RR */
+func getrr(grr GRR) dns.RR {
+	hdr := dns.RR_Header{Name: grr.Name, Rrtype: grr.Type, Class: dns.ClassINET, Ttl: grr.TTL }
+	str := hdr.String() + grr.Data
+	rr,err := dns.NewRR(str)
+	if (err != nil) { dbg(3, "getrr(%s): %s", str, err.Error()) }
+	return rr
+}
+
+/* pass to the request queue and wait until reply */
+func resolve(name string, qtype int) Reply {
+	rchan := make(chan Reply, 1)
+	qchan <- Query{name, qtype, &rchan}
+	return <-rchan
+}
+
 /* resolves queries */
-func resolver() {
-	/* the HTTP client */
-	// FIXME: proper TLS
-//	var httpTr = &http.Transport{ TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+func resolver(server string) {
+	/* setup the HTTP client */
+	var tlsCfg = &tls.Config{ ServerName: "dns.google.com" }
 	var httpTr = http.DefaultTransport.(*http.Transport)
-	httpTr.ExpectContinueTimeout = 0 // fix for Go 1.6
+	httpTr.TLSClientConfig = tlsCfg;
+//	req,_ := http.NewRequest("GET", "https://www.google.com/", nil)
+//	httpTr.RoundTrip(req)
 	var httpClient = &http.Client{ Timeout: time.Second*10, Transport: httpTr }
 
-	for {
-		/* read from the query chan */
-		qs := <-qchan
-		qname := qs.query.Question[0].Name
-		qtype := fmt.Sprintf("%d", qs.query.Question[0].Qtype)
-
-		/* start the reply */
-		reply := qs.query.Copy()
-		reply.Compress = true
+	for q := range qchan {
+		/* make the new response object */
+		r := Reply{ Status: -1 }
 
 		/* prepare the query */
 		v := url.Values{}
-		v.Set("name", qname)
-		v.Set("type", qtype)
+		v.Set("name", q.Name)
+		v.Set("type", fmt.Sprintf("%d", q.Type))
 		// TODO: random padding?
-		addr := "https://http2.golang.org/reqinfo"
-//		addr := fmt.Sprintf("%s/resolve?%s", *server, v.Encode())
+
+		addr     := fmt.Sprintf("%s/resolve?%s", server, v.Encode())
+		hreq,_   := http.NewRequest("GET", addr, nil)
+		hreq.Host = "dns.google.com"
 
 		/* send the query */
-		hreq,_ := http.NewRequest("GET", addr, nil)
-//		hreq.Host = "dns.google.com"
 		resp,err := httpClient.Do(hreq)
-		if (err == nil && resp.StatusCode == 200) {
-			/* read & parse JSON */
+		if (err == nil) {
+			dbg(2, "[%s/%d] %s %s", q.Name, q.Type, resp.Status, resp.Proto)
+
+			/* read */
 			buf,_ := ioutil.ReadAll(resp.Body)
-			dbg(1, "%s", string(buf))
 			resp.Body.Close()
-			var j map[string]interface{}
-			json.Unmarshal(buf, &j)
+			dbg(7, "  reply: %s", buf)
 
-			dbg(3, "[%s/%s] %s %s: %+v", qname, qtype, resp.Status, resp.Proto, j)
-
-			status,_  := j["Status"].(float64)
-			if (status != 0) { dbg(1, "FIXME!") }
-
-			for _,ans := range j["Answer"].([]interface{}) {
-				//answers,_ := j["Answer"]
-				dbg(3, "  %+v", ans)
-			}
-
-		} else if (err == nil) {
-			dbg(1, "[%s/%s] invalid status: %s", qname, qtype, resp.Status)
-			resp.Body.Close()
-		} else {
-			dbg(1, "[%s/%s] error: %s", qname, qtype, err.Error())
-		}
+			/* parse JSON? */
+			if (resp.StatusCode == 200) { json.Unmarshal(buf, &r) }
+		} else { dbg(1, "[%s/%d] error: %s", q.Name, q.Type, err.Error()) }
 
 		/* write the reply */
-		*qs.rchan <- Reply{ qs.query, reply }
+		*q.rchan <- r
 	}
 }
 
@@ -140,7 +180,7 @@ func main() {
 	if err != nil { die(err) }
 
 	/* start workers */
-	for i := 0; i < *workers; i++ { go resolver() }
+	for i := 0; i < *workers; i++ { go resolver(*server) }
 
 	/* accept new connections forever */
 	dbg(1, "dingo ver. 0.1 started on UDP port %d", laddr.Port)
