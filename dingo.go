@@ -20,6 +20,8 @@ import "encoding/json"
 import "crypto/tls"
 import "math/rand"
 import "strings"
+import "github.com/patrickmn/go-cache"
+//import "github.com/devsisters/goquic"
 
 /**********************************************************************/
 
@@ -28,7 +30,7 @@ var (
 	port    = flag.Int("port", 32000, "listen on port number")
 	dbglvl  = flag.Int("dbg", 1, "debugging level")
 	workers = flag.Int("workers", 10, "number of independent workers")
-	server  = flag.String("server", "216.58.209.174", "server address")
+	server  = flag.String("server", "216.58.209.174", "Google DNS web server address")
 	sni     = flag.String("sni", "www.google.com", "SNI string to send (should match server certificate)")
 	edns    = flag.String("edns", "0.0.0.0/0", "edns client subnet")
 	nopad   = flag.Bool("nopad", false, "disable random padding")
@@ -60,11 +62,15 @@ type Reply struct {
 	Additional []GRR
 	Authority  []GRR
 	Comment    string
+	Now        time.Time
 }
 
 /* global channels */
 type Query struct { Name string; Type int; rchan *chan Reply }
 var qchan = make(chan Query, 100)
+
+/* global reply cache */
+var rcache *cache.Cache
 
 /**********************************************************************/
 
@@ -80,13 +86,22 @@ func handle(buf []byte, addr *net.UDPAddr, uc *net.UDPConn) {
 	/* for each question */
 	if (len(msg.Question) < 1) { dbg(3, "no questions"); return }
 
-	/* TODO: check cache */
+	/* check cache */
+	var r Reply
+	cid := fmt.Sprintf("%s/%d", msg.Question[0].Name, msg.Question[0].Qtype)
+	if x, found := rcache.Get(cid); found {
+		// FIXME: update TTLs
+		r = x.(Reply)
+	} else {
+		/* pass to resolvers and block until the response comes */
+		r = resolve(msg.Question[0].Name, int(msg.Question[0].Qtype))
+		dbg(8, "got reply: %+v", r)
 
-	/* pass to resolvers and block until the response comes */
-	r := resolve(msg.Question[0].Name, int(msg.Question[0].Qtype))
-	dbg(8, "got reply: %+v", r)
+		/* put to cache for 10 seconds (FIXME: use minimum TTL) */
+		rcache.Set(cid, r, 10*time.Second)
+	}
 
-	/* rewrite the answers in r */
+	/* rewrite the answers in r into rmsg */
 	rmsg := new(dns.Msg)
 	rmsg.SetReply(msg)
 	rmsg.Compress = true
@@ -133,8 +148,9 @@ func resolve(name string, qtype int) Reply {
 /* resolves queries */
 func resolver(server string) {
 	/* setup the HTTP client */
-	var tlsCfg = &tls.Config{ ServerName: *sni }
 	var httpTr = http.DefaultTransport.(*http.Transport)
+//	var httpTr = goquic.NewRoundTripper(true)
+	var tlsCfg = &tls.Config{ ServerName: *sni }
 	httpTr.TLSClientConfig = tlsCfg;
 //	req,_ := http.NewRequest("GET", "https://www.google.com/", nil)
 //	httpTr.RoundTrip(req)
@@ -172,6 +188,7 @@ func resolver(server string) {
 
 			/* parse JSON? */
 			if (resp.StatusCode == 200) { json.Unmarshal(buf, &r) }
+			r.Now = time.Now()
 		} else { dbg(1, "[%s/%d] error: %s", q.Name, q.Type, err.Error()) }
 
 		/* write the reply */
@@ -186,6 +203,7 @@ func main() {
 //	dbglog = log.New(os.Stderr, "", log.LstdFlags | log.Lshortfile | log.LUTC)
 	dbglog = log.New(os.Stderr, "", log.LstdFlags | log.LUTC)
 	rand.Seed(time.Now().UnixNano())
+	rcache = cache.New(24*time.Hour, 60*time.Second)
 
 	/* listen */
 	laddr   := net.UDPAddr{ Port: *port }
