@@ -18,6 +18,8 @@ import "time"
 import "io/ioutil"
 import "encoding/json"
 import "crypto/tls"
+import "math/rand"
+import "strings"
 
 /**********************************************************************/
 
@@ -25,8 +27,11 @@ import "crypto/tls"
 var (
 	port    = flag.Int("port", 32000, "listen on port number")
 	dbglvl  = flag.Int("dbg", 1, "debugging level")
-	workers = flag.Int("workers", 3, "number of independent workers")
-	server  = flag.String("server", "https://dns.google.com", "server IP address")
+	workers = flag.Int("workers", 10, "number of independent workers")
+	server  = flag.String("server", "216.58.209.174", "server address")
+	sni     = flag.String("sni", "www.google.com", "SNI string to send (should match server certificate)")
+	edns    = flag.String("edns", "0.0.0.0/0", "edns client subnet")
+	nopad   = flag.Bool("nopad", false, "disable random padding")
 )
 
 /**********************************************************************/
@@ -128,7 +133,7 @@ func resolve(name string, qtype int) Reply {
 /* resolves queries */
 func resolver(server string) {
 	/* setup the HTTP client */
-	var tlsCfg = &tls.Config{ ServerName: "dns.google.com" }
+	var tlsCfg = &tls.Config{ ServerName: *sni }
 	var httpTr = http.DefaultTransport.(*http.Transport)
 	httpTr.TLSClientConfig = tlsCfg;
 //	req,_ := http.NewRequest("GET", "https://www.google.com/", nil)
@@ -143,9 +148,15 @@ func resolver(server string) {
 		v := url.Values{}
 		v.Set("name", q.Name)
 		v.Set("type", fmt.Sprintf("%d", q.Type))
-		// TODO: random padding?
+		if len(*edns) > 0 {
+			v.Set("edns_client_subnet", *edns)
+		}
+		if !*nopad {
+			v.Set("random_padding", strings.Repeat(string(65+rand.Intn(26)), rand.Intn(500)))
+		}
 
-		addr     := fmt.Sprintf("%s/resolve?%s", server, v.Encode())
+		/* prepare request, send proper HTTP 'Host:' header */
+		addr     := fmt.Sprintf("https://%s/resolve?%s", server, v.Encode())
 		hreq,_   := http.NewRequest("GET", addr, nil)
 		hreq.Host = "dns.google.com"
 
@@ -172,7 +183,9 @@ func resolver(server string) {
 func main() {
 	/* prepare */
 	flag.Parse()
-	dbglog = log.New(os.Stderr, "", log.LstdFlags | log.Lshortfile | log.LUTC)
+//	dbglog = log.New(os.Stderr, "", log.LstdFlags | log.Lshortfile | log.LUTC)
+	dbglog = log.New(os.Stderr, "", log.LstdFlags | log.LUTC)
+	rand.Seed(time.Now().UnixNano())
 
 	/* listen */
 	laddr   := net.UDPAddr{ Port: *port }
