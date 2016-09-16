@@ -1,7 +1,10 @@
 /**
- * dingo: a DNS cache server in Go
+ * dingo: a Google DNS over HTTPS caching proxy written in Go
  *
- * Copyright (C) 2016 Pawel Foremski <pawel@foremski.pl>
+ * Copyright (C) 2016 Pawel Foremski <pjf@foremski.pl>
+ * Licensed under GNU GPL v3
+ *
+ * NOTE: this software is under development, far from being complete
  */
 
 package main
