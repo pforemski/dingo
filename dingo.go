@@ -141,7 +141,6 @@ func resolve(name string, qtype int) Reply {
 func main() {
 	/* prepare */
 	flag.Parse()
-//	dbglog = log.New(os.Stderr, "", log.LstdFlags | log.Lshortfile | log.LUTC)
 	dbglog = log.New(os.Stderr, "", log.LstdFlags | log.LUTC)
 	rand.Seed(time.Now().UnixNano())
 	rcache = cache.New(24*time.Hour, 60*time.Second)
@@ -153,7 +152,7 @@ func main() {
 
 	/* start workers */
 	gdns_start()
-//	odns_start()
+	odns_start()
 
 	/* accept new connections forever */
 	dbg(1, "dingo ver. 0.11 started on UDP port %d", laddr.Port)
