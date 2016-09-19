@@ -155,7 +155,7 @@ func main() {
 	odns_start()
 
 	/* accept new connections forever */
-	dbg(1, "dingo ver. 0.11 started on UDP port %d", laddr.Port)
+	dbg(1, "dingo ver. 0.12-dev started on UDP port %d", laddr.Port)
 	var buf []byte
 	for {
 		buf = make([]byte, 1500)
