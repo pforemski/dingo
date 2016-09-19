@@ -1,5 +1,5 @@
 /**
- * dingo: a Google DNS over HTTPS caching proxy written in Go
+ * dingo: a DNS caching proxy written in Go
  *
  * Copyright (C) 2016 Pawel Foremski <pjf@foremski.pl>
  * Licensed under GNU GPL v3
@@ -15,29 +15,17 @@ import "net"
 import "flag"
 import "log"
 import "github.com/miekg/dns"
-import "net/http"
-import "net/url"
 import "time"
-import "io/ioutil"
-import "encoding/json"
-import "crypto/tls"
-import "math/rand"
-import "strings"
 import "github.com/patrickmn/go-cache"
-//import "github.com/devsisters/goquic"
+import "math/rand"
 
 /**********************************************************************/
 
 /* command-line arguments */
 var (
-	bindip  = flag.String("bind", "0.0.0.0", "bind to interface ip")
+	bindip  = flag.String("bind", "0.0.0.0", "IP address to bind to")
 	port    = flag.Int("port", 32000, "listen on port number")
-	dbglvl  = flag.Int("dbg", 1, "debugging level")
-	workers = flag.Int("workers", 10, "number of independent workers")
-	server  = flag.String("server", "216.58.209.174", "Google DNS web server address")
-	sni     = flag.String("sni", "www.google.com", "SNI string to send (should match server certificate)")
-	edns    = flag.String("edns", "0.0.0.0/0", "edns client subnet")
-	nopad   = flag.Bool("nopad", false, "disable random padding")
+	dbglvl  = flag.Int("dbg", 2, "debugging level")
 )
 
 /**********************************************************************/
@@ -149,57 +137,6 @@ func resolve(name string, qtype int) Reply {
 	return <-rchan
 }
 
-/* resolves queries */
-func resolver(server string) {
-	/* setup the HTTP client */
-	var httpTr = http.DefaultTransport.(*http.Transport)
-//	var httpTr = goquic.NewRoundTripper(true)
-	var tlsCfg = &tls.Config{ ServerName: *sni }
-	httpTr.TLSClientConfig = tlsCfg;
-//	req,_ := http.NewRequest("GET", "https://www.google.com/", nil)
-//	httpTr.RoundTrip(req)
-	var httpClient = &http.Client{ Timeout: time.Second*10, Transport: httpTr }
-
-	for q := range qchan {
-		/* make the new response object */
-		r := Reply{ Status: -1 }
-
-		/* prepare the query */
-		v := url.Values{}
-		v.Set("name", q.Name)
-		v.Set("type", fmt.Sprintf("%d", q.Type))
-		if len(*edns) > 0 {
-			v.Set("edns_client_subnet", *edns)
-		}
-		if !*nopad {
-			v.Set("random_padding", strings.Repeat(string(65+rand.Intn(26)), rand.Intn(500)))
-		}
-
-		/* prepare request, send proper HTTP 'Host:' header */
-		addr     := fmt.Sprintf("https://%s/resolve?%s", server, v.Encode())
-		hreq,_   := http.NewRequest("GET", addr, nil)
-		hreq.Host = "dns.google.com"
-
-		/* send the query */
-		resp,err := httpClient.Do(hreq)
-		if (err == nil) {
-			dbg(2, "[%s/%d] %s %s", q.Name, q.Type, resp.Status, resp.Proto)
-
-			/* read */
-			buf,_ := ioutil.ReadAll(resp.Body)
-			resp.Body.Close()
-			dbg(7, "  reply: %s", buf)
-
-			/* parse JSON? */
-			if (resp.StatusCode == 200) { json.Unmarshal(buf, &r) }
-			r.Now = time.Now()
-		} else { dbg(1, "[%s/%d] error: %s", q.Name, q.Type, err.Error()) }
-
-		/* write the reply */
-		*q.rchan <- r
-	}
-}
-
 /* main */
 func main() {
 	/* prepare */
@@ -215,10 +152,11 @@ func main() {
 	if err != nil { die(err) }
 
 	/* start workers */
-	for i := 0; i < *workers; i++ { go resolver(*server) }
+	gdns_start()
+//	odns_start()
 
 	/* accept new connections forever */
-	dbg(1, "dingo ver. 0.1 started on UDP port %d", laddr.Port)
+	dbg(1, "dingo ver. 0.11 started on UDP port %d", laddr.Port)
 	var buf []byte
 	for {
 		buf = make([]byte, 1500)
