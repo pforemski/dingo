@@ -1,18 +1,20 @@
 # dingo
 
-A caching DNS proxy for the [Google DNS-over-HTTPS](https://developers.google.com/speed/public-dns/docs/dns-over-https).
+A DNS client in Go that supports the [Google DNS-over-HTTPS](https://developers.google.com/speed/public-dns/docs/dns-over-https).
 It effectively encrypts all your DNS traffic.
 
-For now, it resolves DNS queries over HTTPS/1.1, in a few independent threads (configurable).
-Future plans include HTTP/2.0 and QUIC support, better caching, and support for other resolvers.
+The ultimate goal for the project is to provide a secure, caching DNS proxy that communicates with recursive DNS resolvers over encrypted channels only. For now, it resolves DNS queries over HTTPS/1.1, in a few independent threads. The plans for future plans include HTTP/2.0 and QUIC support, better caching, and other resolvers (e.g. [OpenResolve](https://www.openresolve.com/) by OpenDNS).
 
-You can start it as root using:
+# How to use it?
+
+Download a pre-built binary for your platform from [the latest release](https://github.com/pforemski/dingo/releases/latest) (or build your own).
+
+Run dingo as root on port 53. For example, on Linux:
 ```
-root@localhost:~# go run ./dingo.go ./gdns.go -port=53
+$ sudo ./dingo-linux-amd64 -port=53
 ```
 
-Remember to prepare your Go environment and download all dependencies first.
-
-Alternatively, use pre-built binaries in the `./release` sub-directory.
-
-Note that you will need to update your `/etc/resolv.conf` file to use `dingo` as your system-wide resolver.
+Update your DNS configuration. On Linux, update your `/etc/resolv.conf` file as root (remember to make backup first):
+```
+$ sudo sh -c "echo nameserver 127.0.0.1 > /etc/resolv.conf"
+```
