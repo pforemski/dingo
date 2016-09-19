@@ -30,6 +30,7 @@ import "github.com/patrickmn/go-cache"
 
 /* command-line arguments */
 var (
+	bindip  = flag.String("bind", "0.0.0.0", "bind to interface ip")
 	port    = flag.Int("port", 32000, "listen on port number")
 	dbglvl  = flag.Int("dbg", 1, "debugging level")
 	workers = flag.Int("workers", 10, "number of independent workers")
@@ -209,7 +210,7 @@ func main() {
 	rcache = cache.New(24*time.Hour, 60*time.Second)
 
 	/* listen */
-	laddr   := net.UDPAddr{ Port: *port }
+	laddr   := net.UDPAddr{ IP: net.ParseIP(*bindip), Port: *port }
 	uc, err := net.ListenUDP("udp", &laddr)
 	if err != nil { die(err) }
 
