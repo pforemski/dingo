@@ -55,7 +55,7 @@ func (r *Odns) worker(ip string, sni string, host string) {
 
 	for q := range qchan {
 		/* make the new response object */
-		r := Reply{ Status: -1 }
+		rp := Reply{ Status: -1 }
 
 		/* prepare request, send proper HTTP 'Host:' header */
 		addr     := fmt.Sprintf("https://%s/%s/%s", ip, dns.Type(q.Type).String(), q.Name)
@@ -78,11 +78,11 @@ func (r *Odns) worker(ip string, sni string, host string) {
 				json.Unmarshal(buf, &f)
 				dbg(1, "TODO: %+v", f)
 			}
-			r.Now = time.Now()
+			rp.Now = time.Now()
 		} else { dbg(1, "[%s/%d] error: %s", q.Name, q.Type, err.Error()) }
 
 		/* write the reply */
-		*q.rchan <- r
+		*q.rchan <- rp
 	}
 }
 
