@@ -33,7 +33,7 @@ var (
 /* logging stuff */
 func dbg(lvl int, fmt string, v ...interface{}) { if (*dbglvl >= lvl) { dbglog.Printf(fmt, v...) } }
 func die(msg error) { dbglog.Fatalln("fatal error:", msg.Error()) }
-var dbglog = log.New(os.Stderr, "", log.LstdFlags | log.Lshortfile | log.LUTC)
+var dbglog *log.Logger
 
 /* structures */
 type GRR struct {
@@ -63,6 +63,17 @@ var qchan = make(chan Query, 100)
 
 /* global reply cache */
 var rcache *cache.Cache
+
+/* module interface */
+var Modules = make(map[string]Module)
+type Module interface {
+	Init()
+	Start()
+}
+func mod_register(name string, mod Module) *Module {
+	Modules[name] = mod
+	return &mod
+}
 
 /**********************************************************************/
 
@@ -139,6 +150,9 @@ func resolve(name string, qtype int) Reply {
 
 /* main */
 func main() {
+	/* init modules */
+	for _,mod := range Modules { mod.Init() }
+
 	/* prepare */
 	flag.Parse()
 	dbglog = log.New(os.Stderr, "", log.LstdFlags | log.LUTC)
@@ -151,8 +165,8 @@ func main() {
 	if err != nil { die(err) }
 
 	/* start workers */
-	gdns_start()
-	odns_start()
+//	gdns_start()
+	for _, mod := range Modules { mod.Start() }
 
 	/* accept new connections forever */
 	dbg(1, "dingo ver. 0.12-dev started on UDP port %d", laddr.Port)
