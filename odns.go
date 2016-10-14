@@ -47,7 +47,8 @@ func (r *Odns) Start() {
 
 func (r *Odns) worker(ip string, sni string, host string) {
 	/* setup the HTTP client */
-	var httpTr = http.DefaultTransport.(*http.Transport)
+//	var httpTr = http.DefaultTransport.(*http.Transport)
+	var httpTr = new(http.Transport)
 	var tlsCfg = &tls.Config{ ServerName: sni }
 	httpTr.TLSClientConfig = tlsCfg;
 	var httpClient = &http.Client{ Timeout: time.Second*10, Transport: httpTr }

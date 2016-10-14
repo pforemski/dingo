@@ -165,7 +165,7 @@ func main() {
 	if err != nil { die(err) }
 
 	/* start workers */
-//	gdns_start()
+	gdns_start()
 	for _, mod := range Modules { mod.Start() }
 
 	/* accept new connections forever */

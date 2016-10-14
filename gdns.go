@@ -42,7 +42,8 @@ func gdns_start() {
 
 func gdns_resolver(server string) {
 	/* setup the HTTP client */
-	var httpTr = http.DefaultTransport.(*http.Transport)
+	//var httpTr = http.DefaultTransport.(*http.Transport)
+	var httpTr = new(http.Transport)
 //	var httpTr = goquic.NewRoundTripper(true)
 
 	var tlsCfg = &tls.Config{ ServerName: *gdns_sni }
