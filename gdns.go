@@ -9,20 +9,17 @@
 package main
 
 import "fmt"
-import "net/http"
 import "net/url"
 import "time"
-import "io/ioutil"
 import "encoding/json"
-import "crypto/tls"
 import "math/rand"
 import "strings"
 import "flag"
-//import "github.com/devsisters/goquic"
 
 type Gdns struct {
 	workers *int
 	server *string
+	noauto *bool
 	sni *string
 	host *string
 	edns *string
@@ -33,8 +30,10 @@ type Gdns struct {
 func (r *Gdns) Init() {
 	r.workers = flag.Int("gdns:workers", 10,
 		"Google DNS: number of independent workers")
-	r.server  = flag.String("gdns:server", "216.58.209.174",
-		"Google DNS: web server address")
+	r.server  = flag.String("gdns:server", "216.58.195.78",
+		"Google DNS: server address")
+	r.noauto   = flag.Bool("gdns:noauto", false,
+		"Google DNS: dont try to lookup a closer server")
 	r.sni     = flag.String("gdns:sni", "www.google.com",
 		"Google DNS: SNI string to send (should match server certificate)")
 	r.host    = flag.String("gdns:host", "dns.google.com",
@@ -47,62 +46,50 @@ func (r *Gdns) Init() {
 
 /**********************************************************************/
 
-func (r *Gdns) Start() {
-	dbg(1, "starting %d Google Public DNS clients", *r.workers)
-	for i := 0; i < *r.workers; i++ {
-		go r.worker(*r.server)
+func (R *Gdns) Start() {
+	if *R.workers <= 0 { return }
+
+	// FIXME: naive (IPv4, Answer[0].Data, etc?)
+	if !*R.noauto {
+		dbg(1, "resolving dns.google.com...")
+		r4 := R.resolve(NewHttps(*R.sni), *R.server, "dns.google.com", 1)
+		if r4.Status == 0 { R.server = &r4.Answer[0].Data }
 	}
+
+	dbg(1, "starting %d Google Public DNS client(s) querying server %s",
+		*R.workers, *R.server)
+	for i := 0; i < *R.workers; i++ { go R.worker(*R.server) }
 }
 
-func (r *Gdns) worker(ip string) {
-	/* setup the HTTP client */
-	//var httpTr = http.DefaultTransport.(*http.Transport)
-	var httpTr = new(http.Transport)
-	var tlsCfg = &tls.Config{ ServerName: *r.sni }
-	httpTr.TLSClientConfig = tlsCfg;
-//	req,_ := http.NewRequest("GET", "https://www.google.com/", nil)
-//	httpTr.RoundTrip(req)
-	var httpClient = &http.Client{ Timeout: time.Second*10, Transport: httpTr }
+func (R *Gdns) worker(server string) {
+	var https = NewHttps(*R.sni)
+	for q := range qchan { *q.rchan <- *R.resolve(https, server, q.Name, q.Type) }
+}
 
-	for q := range qchan {
-		/* make the new response object */
-		rp := Reply{ Status: -1 }
+func (R *Gdns) resolve(https *Https, server string, qname string, qtype int) *Reply {
+	r := Reply{ Status: -1 }
+	v := url.Values{}
 
-		/* prepare the query */
-		v := url.Values{}
-		v.Set("name", q.Name)
-		v.Set("type", fmt.Sprintf("%d", q.Type))
-		if len(*r.edns) > 0 {
-			v.Set("edns_client_subnet", *r.edns)
-		}
-		if !*r.nopad {
-			v.Set("random_padding", strings.Repeat(string(65+rand.Intn(26)), rand.Intn(500)))
-		}
-
-		/* prepare request, send proper HTTP 'Host:' header */
-		addr     := fmt.Sprintf("https://%s/resolve?%s", ip, v.Encode())
-		hreq,_   := http.NewRequest("GET", addr, nil)
-		hreq.Host = "dns.google.com"
-
-		/* send the query */
-		resp,err := httpClient.Do(hreq)
-		if (err == nil) {
-			dbg(2, "[%s/%d] %s %s", q.Name, q.Type, resp.Status, resp.Proto)
-
-			/* read */
-			buf,_ := ioutil.ReadAll(resp.Body)
-			resp.Body.Close()
-			dbg(7, "  reply: %s", buf)
-
-			/* parse JSON? */
-			if (resp.StatusCode == 200) { json.Unmarshal(buf, &rp) }
-			rp.Now = time.Now()
-		} else { dbg(1, "[%s/%d] error: %s", q.Name, q.Type, err.Error()) }
-
-		/* write the reply */
-		*q.rchan <- rp
+	/* prepare */
+	v.Set("name", qname)
+	v.Set("type", fmt.Sprintf("%d", qtype))
+	if len(*R.edns) > 0 {
+		v.Set("edns_client_subnet", *R.edns)
 	}
+	if !*R.nopad {
+		v.Set("random_padding", strings.Repeat(string(65+rand.Intn(26)), rand.Intn(500)))
+	}
+
+	/* query */
+	buf, err := https.Get(server, *R.host, "/resolve?" + v.Encode())
+	if err != nil { return &r }
+
+	/* parse */
+	r.Now = time.Now()
+	json.Unmarshal(buf, &r)
+
+	return &r
 }
 
 /* register module */
-var _ = mod_register("gdns", new(Gdns))
+var _ = register("gdns", new(Gdns))

@@ -23,7 +23,7 @@ import "math/rand"
 
 /* command-line arguments */
 var (
-	bindip  = flag.String("bind", "0.0.0.0", "IP address to bind to")
+	bindip  = flag.String("bind", "127.0.0.1", "IP address to bind to")
 	port    = flag.Int("port", 32000, "listen on port number")
 	dbglvl  = flag.Int("dbg", 2, "debugging level")
 )
@@ -70,7 +70,7 @@ type Module interface {
 	Init()
 	Start()
 }
-func mod_register(name string, mod Module) *Module {
+func register(name string, mod Module) *Module {
 	Modules[name] = mod
 	return &mod
 }
@@ -150,13 +150,12 @@ func resolve(name string, qtype int) Reply {
 
 /* main */
 func main() {
-	/* init modules */
-	for _,mod := range Modules { mod.Init() }
+	rand.Seed(time.Now().UnixNano())
+	dbglog = log.New(os.Stderr, "", log.LstdFlags | log.LUTC)
 
 	/* prepare */
+	for _,mod := range Modules { mod.Init() }
 	flag.Parse()
-	dbglog = log.New(os.Stderr, "", log.LstdFlags | log.LUTC)
-	rand.Seed(time.Now().UnixNano())
 	rcache = cache.New(24*time.Hour, 60*time.Second)
 
 	/* listen */
