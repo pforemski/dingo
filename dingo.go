@@ -79,25 +79,31 @@ func register(name string, mod Module) *Module {
 
 /* UDP request handler */
 func handle(buf []byte, addr *net.UDPAddr, uc *net.UDPConn) {
-	dbg(3, "new request from %s (%d bytes)", addr, len(buf))
-
 	/* try unpacking */
 	msg := new(dns.Msg)
-	if err := msg.Unpack(buf); err != nil { dbg(3, "Unpack failed: %s", err); return }
-	dbg(7, "unpacked: %s", msg)
+	if err := msg.Unpack(buf); err != nil {
+		dbg(3, "unpack failed: %s", err)
+		return
+	} else {
+		dbg(7, "unpacked message: %s", msg)
+	}
 
-	/* for each question */
+	/* any questions? */
 	if (len(msg.Question) < 1) { dbg(3, "no questions"); return }
+
+	qname := msg.Question[0].Name
+	qtype := msg.Question[0].Qtype
+	dbg(2, "resolving %s/%s", qname, dns.TypeToString[qtype])
 
 	/* check cache */
 	var r Reply
-	cid := fmt.Sprintf("%s/%d", msg.Question[0].Name, msg.Question[0].Qtype)
+	cid := fmt.Sprintf("%s/%d", qname, qtype)
 	if x, found := rcache.Get(cid); found {
 		// FIXME: update TTLs
 		r = x.(Reply)
 	} else {
 		/* pass to resolvers and block until the response comes */
-		r = resolve(msg.Question[0].Name, int(msg.Question[0].Qtype))
+		r = resolve(qname, int(qtype))
 		dbg(8, "got reply: %+v", r)
 
 		/* put to cache for 10 seconds (FIXME: use minimum TTL) */
@@ -167,7 +173,7 @@ func main() {
 	for _, mod := range Modules { mod.Start() }
 
 	/* accept new connections forever */
-	dbg(1, "dingo ver. 0.12-dev started on UDP port %d", laddr.Port)
+	dbg(1, "dingo ver. 0.12 listening on %s UDP port %d", *bindip, laddr.Port)
 	var buf []byte
 	for {
 		buf = make([]byte, 1500)

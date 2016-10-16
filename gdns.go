@@ -19,7 +19,7 @@ import "flag"
 type Gdns struct {
 	workers *int
 	server *string
-	noauto *bool
+	auto *bool
 	sni *string
 	host *string
 	edns *string
@@ -32,8 +32,8 @@ func (r *Gdns) Init() {
 		"Google DNS: number of independent workers")
 	r.server  = flag.String("gdns:server", "216.58.195.78",
 		"Google DNS: server address")
-	r.noauto   = flag.Bool("gdns:noauto", false,
-		"Google DNS: dont try to lookup a closer server")
+	r.auto   = flag.Bool("gdns:auto", false,
+		"Google DNS: try to lookup the closest IPv4 server")
 	r.sni     = flag.String("gdns:sni", "www.google.com",
 		"Google DNS: SNI string to send (should match server certificate)")
 	r.host    = flag.String("gdns:host", "dns.google.com",
@@ -49,11 +49,12 @@ func (r *Gdns) Init() {
 func (R *Gdns) Start() {
 	if *R.workers <= 0 { return }
 
-	// FIXME: naive (IPv4, Answer[0].Data, etc?)
-	if !*R.noauto {
+	if *R.auto {
 		dbg(1, "resolving dns.google.com...")
 		r4 := R.resolve(NewHttps(*R.sni), *R.server, "dns.google.com", 1)
-		if r4.Status == 0 { R.server = &r4.Answer[0].Data }
+		if r4.Status == 0 && len(r4.Answer) > 0 {
+			R.server = &r4.Answer[0].Data
+		}
 	}
 
 	dbg(1, "starting %d Google Public DNS client(s) querying server %s",

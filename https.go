@@ -13,7 +13,6 @@ import "net/http"
 import "io/ioutil"
 import "crypto/tls"
 import "errors"
-//import "encoding/json"
 
 type Https struct {
 	client    http.Client
