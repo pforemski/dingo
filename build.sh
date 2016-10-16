@@ -1,7 +1,9 @@
 #!/bin/bash
 
 [ -z "$1" ] && { echo "Usage: build.sh VERSION" >&1; exit 1; }
+
 VERSION="$1"
+DEST="$HOME/tmp/dingo-$VERSION"
 
 ###############################################
 
@@ -11,14 +13,15 @@ function build()
 
 	echo "Building dingo v. $VERSION for $TARGET"
 	GOOS="${TARGET%-*}" GOARCH="${TARGET##*-}" go build \
-		-o release/dingo-$VERSION/dingo-$TARGET \
-		./dingo.go ./gdns.go
+		-o $DEST/dingo-$TARGET \
+		./*.go
 }
 
 ###############################################
 
-rm -fr ./release/dingo-$VERSION
-mkdir -p ./release/dingo-$VERSION
+echo "Building in $DEST"
+rm -fr $DEST
+mkdir -p $DEST
 
 for target in \
 	darwin-386 darwin-amd64 \

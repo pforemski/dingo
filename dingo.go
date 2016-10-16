@@ -23,7 +23,7 @@ import "math/rand"
 
 /* command-line arguments */
 var (
-	bindip  = flag.String("bind", "0.0.0.0", "IP address to bind to")
+	bindip  = flag.String("bind", "127.0.0.1", "IP address to bind to")
 	port    = flag.Int("port", 32000, "listen on port number")
 	dbglvl  = flag.Int("dbg", 2, "debugging level")
 )
@@ -33,7 +33,7 @@ var (
 /* logging stuff */
 func dbg(lvl int, fmt string, v ...interface{}) { if (*dbglvl >= lvl) { dbglog.Printf(fmt, v...) } }
 func die(msg error) { dbglog.Fatalln("fatal error:", msg.Error()) }
-var dbglog = log.New(os.Stderr, "", log.LstdFlags | log.Lshortfile | log.LUTC)
+var dbglog *log.Logger
 
 /* structures */
 type GRR struct {
@@ -64,29 +64,46 @@ var qchan = make(chan Query, 100)
 /* global reply cache */
 var rcache *cache.Cache
 
+/* module interface */
+var Modules = make(map[string]Module)
+type Module interface {
+	Init()
+	Start()
+}
+func register(name string, mod Module) *Module {
+	Modules[name] = mod
+	return &mod
+}
+
 /**********************************************************************/
 
 /* UDP request handler */
 func handle(buf []byte, addr *net.UDPAddr, uc *net.UDPConn) {
-	dbg(3, "new request from %s (%d bytes)", addr, len(buf))
-
 	/* try unpacking */
 	msg := new(dns.Msg)
-	if err := msg.Unpack(buf); err != nil { dbg(3, "Unpack failed: %s", err); return }
-	dbg(7, "unpacked: %s", msg)
+	if err := msg.Unpack(buf); err != nil {
+		dbg(3, "unpack failed: %s", err)
+		return
+	} else {
+		dbg(7, "unpacked message: %s", msg)
+	}
 
-	/* for each question */
+	/* any questions? */
 	if (len(msg.Question) < 1) { dbg(3, "no questions"); return }
+
+	qname := msg.Question[0].Name
+	qtype := msg.Question[0].Qtype
+	dbg(2, "resolving %s/%s", qname, dns.TypeToString[qtype])
 
 	/* check cache */
 	var r Reply
-	cid := fmt.Sprintf("%s/%d", msg.Question[0].Name, msg.Question[0].Qtype)
+	cid := fmt.Sprintf("%s/%d", qname, qtype)
 	if x, found := rcache.Get(cid); found {
 		// FIXME: update TTLs
 		r = x.(Reply)
 	} else {
 		/* pass to resolvers and block until the response comes */
-		r = resolve(msg.Question[0].Name, int(msg.Question[0].Qtype))
+		r = resolve(qname, int(qtype))
 		dbg(8, "got reply: %+v", r)
 
 		/* put to cache for 10 seconds (FIXME: use minimum TTL) */
@@ -139,11 +156,12 @@ func resolve(name string, qtype int) Reply {
 
 /* main */
 func main() {
-	/* prepare */
-	flag.Parse()
-//	dbglog = log.New(os.Stderr, "", log.LstdFlags | log.Lshortfile | log.LUTC)
-	dbglog = log.New(os.Stderr, "", log.LstdFlags | log.LUTC)
 	rand.Seed(time.Now().UnixNano())
+	dbglog = log.New(os.Stderr, "", log.LstdFlags | log.LUTC)
+
+	/* prepare */
+	for _,mod := range Modules { mod.Init() }
+	flag.Parse()
 	rcache = cache.New(24*time.Hour, 60*time.Second)
 
 	/* listen */
@@ -152,11 +170,10 @@ func main() {
 	if err != nil { die(err) }
 
 	/* start workers */
-	gdns_start()
-//	odns_start()
+	for _, mod := range Modules { mod.Start() }
 
 	/* accept new connections forever */
-	dbg(1, "dingo ver. 0.11 started on UDP port %d", laddr.Port)
+	dbg(1, "dingo ver. 0.12 listening on %s UDP port %d", *bindip, laddr.Port)
 	var buf []byte
 	for {
 		buf = make([]byte, 1500)
