@@ -13,10 +13,11 @@ import "net/http"
 import "io/ioutil"
 import "crypto/tls"
 import "errors"
+import "golang.org/x/net/http2"
 
 type Https struct {
 	client    http.Client
-	transport http.Transport
+	transport http2.Transport
 	tlscfg    tls.Config
 }
 
