@@ -1,14 +1,13 @@
 # dingo
-
-A DNS client in Go that supports the [Google
+A DNS client (stub resolver) implemented in Go for the [Google
 DNS-over-HTTPS](https://developers.google.com/speed/public-dns/docs/dns-over-https).
 It effectively encrypts all your DNS traffic. It also supports
 [OpenResolve](https://www.openresolve.com/) by OpenDNS.
 
-The ultimate goal for the project is to provide a secure, caching DNS proxy that
+The ultimate goal for the project is to provide a secure, caching DNS client that
 communicates with recursive DNS resolvers over encrypted channels only. For now,
-it resolves DNS queries over HTTPS/1.1 in independent threads. The plans for
-future include better caching and support for HTTP/2.0 and QUIC.
+it resolves DNS queries over HTTP/2 in independent threads. The plans for
+future include better caching and support for QUIC.
 
 ## Quick start
 
@@ -63,6 +62,8 @@ Usage of dingo-linux-amd64:
     	Google DNS: SNI string to send (should match server certificate) (default "www.google.com")
   -gdns:workers int
     	Google DNS: number of independent workers (default 10)
+  -h1
+    	use HTTPS/1.1 transport
   -odns:host string
     	OpenDNS: HTTP 'Host' header (real FQDN, encrypted in TLS) (default "api.openresolve.com")
   -odns:server string

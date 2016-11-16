@@ -23,15 +23,16 @@ import "math/rand"
 
 /* command-line arguments */
 var (
-	bindip  = flag.String("bind", "127.0.0.1", "IP address to bind to")
-	port    = flag.Int("port", 32000, "listen on port number")
-	dbglvl  = flag.Int("dbg", 2, "debugging level")
+	opt_bindip  = flag.String("bind", "127.0.0.1", "IP address to bind to")
+	opt_port    = flag.Int("port", 32000, "listen on port number")
+	opt_h1      = flag.Bool("h1", false, "use HTTPS/1.1 transport")
+	opt_dbglvl  = flag.Int("dbg", 2, "debugging level")
 )
 
 /**********************************************************************/
 
 /* logging stuff */
-func dbg(lvl int, fmt string, v ...interface{}) { if (*dbglvl >= lvl) { dbglog.Printf(fmt, v...) } }
+func dbg(lvl int, fmt string, v ...interface{}) { if (*opt_dbglvl >= lvl) { dbglog.Printf(fmt, v...) } }
 func die(msg error) { dbglog.Fatalln("fatal error:", msg.Error()) }
 var dbglog *log.Logger
 
@@ -165,7 +166,7 @@ func main() {
 	rcache = cache.New(24*time.Hour, 60*time.Second)
 
 	/* listen */
-	laddr   := net.UDPAddr{ IP: net.ParseIP(*bindip), Port: *port }
+	laddr   := net.UDPAddr{ IP: net.ParseIP(*opt_bindip), Port: *opt_port }
 	uc, err := net.ListenUDP("udp", &laddr)
 	if err != nil { die(err) }
 
@@ -173,7 +174,7 @@ func main() {
 	for _, mod := range Modules { mod.Start() }
 
 	/* accept new connections forever */
-	dbg(1, "dingo ver. 0.12 listening on %s UDP port %d", *bindip, laddr.Port)
+	dbg(1, "dingo ver. 0.13 listening on %s UDP port %d", *opt_bindip, laddr.Port)
 	var buf []byte
 	for {
 		buf = make([]byte, 1500)
