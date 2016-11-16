@@ -13,21 +13,34 @@ import "net/http"
 import "io/ioutil"
 import "crypto/tls"
 import "errors"
+import "golang.org/x/net/http2"
 
 type Https struct {
-	client    http.Client
-	transport http.Transport
-	tlscfg    tls.Config
+	client     http.Client
 }
 
 func NewHttps(sni string) *Https {
 	H := Https{}
 
-	/* basic setup */
+	/* TLS setup */
+	tlscfg := new(tls.Config)
+	tlscfg.ServerName = sni
+
+	/* HTTP transport */
+	var tr http.RoundTripper
+	if (*opt_h1) {
+		h1 := new(http.Transport)
+		h1.TLSClientConfig = tlscfg
+		tr = h1
+	} else {
+		h2 := new(http2.Transport)
+		h2.TLSClientConfig = tlscfg
+		tr = h2
+	}
+
+	/* HTTP client */
 	H.client.Timeout = time.Second * 10
-	H.client.Transport = &H.transport
-	H.transport.TLSClientConfig = &H.tlscfg
-	H.tlscfg.ServerName = sni
+	H.client.Transport = tr
 
 	return &H
 }

@@ -64,7 +64,9 @@ func (R *Gdns) Start() {
 
 func (R *Gdns) worker(server string) {
 	var https = NewHttps(*R.sni)
-	for q := range qchan { *q.rchan <- *R.resolve(https, server, q.Name, q.Type) }
+	for q := range qchan {
+		*q.rchan <- *R.resolve(https, server, q.Name, q.Type)
+	}
 }
 
 func (R *Gdns) resolve(https *Https, server string, qname string, qtype int) *Reply {
