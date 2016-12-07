@@ -52,6 +52,8 @@ Usage of dingo-linux-amd64:
     	Google DNS: try to lookup the closest IPv4 server
   -gdns:edns string
     	Google DNS: EDNS client subnet (set 0.0.0.0/0 to disable)
+  -gdns:edns6 string
+    	Google DNS: Optional IPv6 EDNS client subnet for AAAA queries
   -gdns:host string
     	Google DNS: HTTP 'Host' header (real FQDN, encrypted in TLS) (default "dns.google.com")
   -gdns:nopad
