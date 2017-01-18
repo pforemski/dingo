@@ -72,7 +72,7 @@ func (R *Odns) Start() {
 
 /* handler of new requests */
 func (R *Odns) worker(server string) {
-	var https = NewHttps(*R.sni)
+	var https = NewHttps(*R.sni, true)
 	for q := range qchan {
 		*q.rchan <- *R.resolve(https, server, q.Name, q.Type)
 	}

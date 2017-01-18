@@ -51,7 +51,7 @@ func (R *Gdns) Start() {
 
 	if *R.auto {
 		dbg(1, "resolving dns.google.com...")
-		r4 := R.resolve(NewHttps(*R.sni), *R.server, "dns.google.com", 1)
+		r4 := R.resolve(NewHttps(*R.sni, false), *R.server, "dns.google.com", 1)
 		if r4.Status == 0 && len(r4.Answer) > 0 {
 			R.server = &r4.Answer[0].Data
 		}
@@ -63,7 +63,7 @@ func (R *Gdns) Start() {
 }
 
 func (R *Gdns) worker(server string) {
-	var https = NewHttps(*R.sni)
+	var https = NewHttps(*R.sni, false)
 	for q := range qchan {
 		*q.rchan <- *R.resolve(https, server, q.Name, q.Type)
 	}

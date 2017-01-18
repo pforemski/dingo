@@ -20,7 +20,7 @@ type Https struct {
 	client     http.Client
 }
 
-func NewHttps(sni string) *Https {
+func NewHttps(sni string, forceh1 bool) *Https {
 	H := Https{}
 
 	/* TLS setup */
@@ -30,14 +30,16 @@ func NewHttps(sni string) *Https {
 	/* HTTP transport */
 	var tr http.RoundTripper
 	switch {
+	case forceh1 || *opt_h1:
+		h1 := new(http.Transport)
+		h1.TLSClientConfig = tlscfg
+		tr = h1
+
 	case *opt_quic:
 		quic := new(h2quic.QuicRoundTripper)
 //		quic.TLSClientConfig = tlscfg // FIXME
 		tr = quic
-	case *opt_h1:
-		h1 := new(http.Transport)
-		h1.TLSClientConfig = tlscfg
-		tr = h1
+
 	default:
 		h2 := new(http2.Transport)
 		h2.TLSClientConfig = tlscfg
