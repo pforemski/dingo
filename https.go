@@ -2,7 +2,7 @@
  * dingo: a DNS caching proxy written in Go
  * This file implements common code for HTTPS+JSON requests
  *
- * Copyright (C) 2016 Pawel Foremski <pjf@foremski.pl>
+ * Copyright (C) 2016-2017 Pawel Foremski <pjf@foremski.pl>
  * Licensed under GNU GPL v3
  */
 
@@ -14,6 +14,7 @@ import "io/ioutil"
 import "crypto/tls"
 import "errors"
 import "golang.org/x/net/http2"
+import "github.com/lucas-clemente/quic-go/h2quic"
 
 type Https struct {
 	client     http.Client
@@ -28,11 +29,16 @@ func NewHttps(sni string) *Https {
 
 	/* HTTP transport */
 	var tr http.RoundTripper
-	if (*opt_h1) {
+	switch {
+	case *opt_quic:
+		quic := new(h2quic.QuicRoundTripper)
+//		quic.TLSClientConfig = tlscfg // FIXME
+		tr = quic
+	case *opt_h1:
 		h1 := new(http.Transport)
 		h1.TLSClientConfig = tlscfg
 		tr = h1
-	} else {
+	default:
 		h2 := new(http2.Transport)
 		h2.TLSClientConfig = tlscfg
 		tr = h2
@@ -52,7 +58,7 @@ func (R *Https) Get(ip string, host string, uri string) ([]byte, error) {
 		dbg(1, "http.NewRequest(): %s", err)
 		return nil, err
 	}
-	hreq.Host = host
+	hreq.Host = host // FIXME: doesn't have an effect for QUIC
 
 	/* send the query */
 	resp, err := R.client.Do(hreq)

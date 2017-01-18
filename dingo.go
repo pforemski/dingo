@@ -1,7 +1,7 @@
 /**
  * dingo: a DNS caching proxy written in Go
  *
- * Copyright (C) 2016 Pawel Foremski <pjf@foremski.pl>
+ * Copyright (C) 2016-2017 Pawel Foremski <pjf@foremski.pl>
  * Licensed under GNU GPL v3
  *
  * NOTE: this software is under development, far from being complete
@@ -26,6 +26,7 @@ var (
 	opt_bindip  = flag.String("bind", "127.0.0.1", "IP address to bind to")
 	opt_port    = flag.Int("port", 32000, "listen on port number")
 	opt_h1      = flag.Bool("h1", false, "use HTTPS/1.1 transport")
+	opt_quic    = flag.Bool("quic", false, "use experimental QUIC transport")
 	opt_dbglvl  = flag.Int("dbg", 2, "debugging level")
 )
 
