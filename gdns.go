@@ -18,36 +18,38 @@ import "flag"
 
 type Gdns struct {
 	workers *int
-	server *string
-	auto *bool
-	sni *string
-	host *string
-	edns *string
-	nopad *bool
+	server  *string
+	auto    *bool
+	sni     *string
+	host    *string
+	edns    *string
+	nopad   *bool
 }
 
 /* command-line arguments */
 func (r *Gdns) Init() {
 	r.workers = flag.Int("gdns:workers", 10,
 		"Google DNS: number of independent workers")
-	r.server  = flag.String("gdns:server", "216.58.195.78",
+	r.server = flag.String("gdns:server", "216.58.195.78",
 		"Google DNS: server address")
-	r.auto   = flag.Bool("gdns:auto", false,
+	r.auto = flag.Bool("gdns:auto", false,
 		"Google DNS: try to lookup the closest IPv4 server")
-	r.sni     = flag.String("gdns:sni", "www.google.com",
+	r.sni = flag.String("gdns:sni", "www.google.com",
 		"Google DNS: SNI string to send (should match server certificate)")
-	r.host    = flag.String("gdns:host", "dns.google.com",
+	r.host = flag.String("gdns:host", "dns.google.com",
 		"Google DNS: HTTP 'Host' header (real FQDN, encrypted in TLS)")
-	r.edns    = flag.String("gdns:edns", "",
+	r.edns = flag.String("gdns:edns", "",
 		"Google DNS: EDNS client subnet (set 0.0.0.0/0 to disable)")
-	r.nopad   = flag.Bool("gdns:nopad", false,
+	r.nopad = flag.Bool("gdns:nopad", false,
 		"Google DNS: disable random padding")
 }
 
 /**********************************************************************/
 
 func (R *Gdns) Start() {
-	if *R.workers <= 0 { return }
+	if *R.workers <= 0 {
+		return
+	}
 
 	if *R.auto {
 		dbg(1, "resolving dns.google.com...")
@@ -59,7 +61,9 @@ func (R *Gdns) Start() {
 
 	dbg(1, "starting %d Google Public DNS client(s) querying server %s",
 		*R.workers, *R.server)
-	for i := 0; i < *R.workers; i++ { go R.worker(*R.server) }
+	for i := 0; i < *R.workers; i++ {
+		go R.worker(*R.server)
+	}
 }
 
 func (R *Gdns) worker(server string) {
@@ -70,7 +74,7 @@ func (R *Gdns) worker(server string) {
 }
 
 func (R *Gdns) resolve(https *Https, server string, qname string, qtype int) *Reply {
-	r := Reply{ Status: -1 }
+	r := Reply{Status: -1}
 	v := url.Values{}
 
 	/* prepare */
@@ -84,8 +88,10 @@ func (R *Gdns) resolve(https *Https, server string, qname string, qtype int) *Re
 	}
 
 	/* query */
-	buf, err := https.Get(server, *R.host, "/resolve?" + v.Encode())
-	if err != nil { return &r }
+	buf, err := https.Get(server, *R.host, "/resolve?"+v.Encode())
+	if err != nil {
+		return &r
+	}
 
 	/* parse */
 	r.Now = time.Now()
