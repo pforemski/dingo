@@ -23,11 +23,12 @@ import "math/rand"
 
 /* command-line arguments */
 var (
-	opt_bindip = flag.String("bind", "127.0.0.1", "IP address to bind to")
-	opt_port   = flag.Int("port", 32000, "listen on port number")
-	opt_h1     = flag.Bool("h1", false, "use HTTPS/1.1 transport")
-	opt_quic   = flag.Bool("quic", false, "use experimental QUIC transport")
-	opt_dbglvl = flag.Int("dbg", 2, "debugging level")
+	opt_bindip   = flag.String("bind", "127.0.0.1", "IP address to bind to")
+	opt_port     = flag.Int("port", 32000, "listen on port number")
+	opt_h1       = flag.Bool("h1", false, "use HTTPS/1.1 transport")
+	opt_quic     = flag.Bool("quic", false, "use experimental QUIC transport")
+	opt_insecure = flag.Bool("insecure", false, "disable SSL Certificate check")
+	opt_dbglvl   = flag.Int("dbg", 2, "debugging level")
 )
 
 /**********************************************************************/

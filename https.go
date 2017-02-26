@@ -26,6 +26,7 @@ func NewHttps(sni string, forceh1 bool) *Https {
 	/* TLS setup */
 	tlscfg := new(tls.Config)
 	tlscfg.ServerName = sni
+	tlscfg.InsecureSkipVerify = *opt_insecure
 
 	/* HTTP transport */
 	var tr http.RoundTripper
