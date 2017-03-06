@@ -9,15 +9,20 @@
 
 package main
 
-import "fmt"
-import "os"
-import "net"
-import "flag"
-import "log"
-import "github.com/miekg/dns"
-import "time"
-import "github.com/patrickmn/go-cache"
-import "math/rand"
+import (
+	"flag"
+	"fmt"
+	"log"
+	"math/rand"
+	"net"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/miekg/dns"
+	"github.com/patrickmn/go-cache"
+)
 
 /**********************************************************************/
 
@@ -93,25 +98,16 @@ func register(name string, mod Module) *Module {
 
 /**********************************************************************/
 
-/* UDP request handler */
-func handle(buf []byte, addr *net.UDPAddr, uc *net.UDPConn) {
-	/* try unpacking */
-	msg := new(dns.Msg)
-	if err := msg.Unpack(buf); err != nil {
-		dbg(3, "unpack failed: %s", err)
-		return
-	} else {
-		dbg(7, "unpacked message: %s", msg)
-	}
-
+/* DNS request handler */
+func handleDNS(w dns.ResponseWriter, req *dns.Msg) {
 	/* any questions? */
-	if len(msg.Question) < 1 {
+	if len(req.Question) < 1 {
 		dbg(3, "no questions")
 		return
 	}
 
-	qname := msg.Question[0].Name
-	qtype := msg.Question[0].Qtype
+	qname := req.Question[0].Name
+	qtype := req.Question[0].Qtype
 	dbg(2, "resolving %s/%s", qname, dns.TypeToString[qtype])
 
 	/* check cache */
@@ -131,7 +127,7 @@ func handle(buf []byte, addr *net.UDPAddr, uc *net.UDPConn) {
 
 	/* rewrite the answers in r into rmsg */
 	rmsg := new(dns.Msg)
-	rmsg.SetReply(msg)
+	rmsg.SetReply(req)
 	rmsg.Compress = true
 	if r.Status >= 0 {
 		rmsg.Rcode = r.Status
@@ -157,13 +153,7 @@ func handle(buf []byte, addr *net.UDPAddr, uc *net.UDPConn) {
 	dbg(8, "sending %s", rmsg.String())
 	//	rmsg.Truncated = true
 
-	/* pack and send! */
-	rbuf, err := rmsg.Pack()
-	if err != nil {
-		dbg(2, "Pack() failed: %s", err)
-		return
-	}
-	uc.WriteToUDP(rbuf, addr)
+	w.WriteMsg(rmsg)
 }
 
 /* convert Google RR to miekg/dns RR */
@@ -198,10 +188,6 @@ func main() {
 
 	/* listen */
 	laddr := net.UDPAddr{IP: net.ParseIP(*opt_bindip), Port: *opt_port}
-	uc, err := net.ListenUDP("udp", &laddr)
-	if err != nil {
-		die(err)
-	}
 
 	/* start workers */
 	for _, mod := range Modules {
@@ -209,15 +195,27 @@ func main() {
 	}
 
 	/* accept new connections forever */
-	dbg(1, "dingo ver. 0.13 listening on %s UDP port %d", *opt_bindip, laddr.Port)
-	var buf []byte
-	for {
-		buf = make([]byte, 1500)
-		n, addr, err := uc.ReadFromUDP(buf)
-		if err == nil {
-			go handle(buf[0:n], addr, uc)
-		}
-	}
+	dbg(1, "dingo ver. 0.13 listening on %s UDP+TCP port %d", laddr.IP, laddr.Port)
 
-	uc.Close()
+	udpServer := &dns.Server{Addr: fmt.Sprintf("%s:%d", laddr.IP, laddr.Port), Net: "udp"}
+	tcpServer := &dns.Server{Addr: fmt.Sprintf("%s:%d", laddr.IP, laddr.Port), Net: "tcp"}
+	dns.HandleFunc(".", handleDNS)
+	go func() {
+		if err := udpServer.ListenAndServe(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+	go func() {
+		if err := tcpServer.ListenAndServe(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	// Wait for SIGINT or SIGTERM
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	<-sigs
+
+	udpServer.Shutdown()
+	tcpServer.Shutdown()
 }
