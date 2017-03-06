@@ -41,7 +41,7 @@ for v in ${ARMS[@]}; do
 	env CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=$v go build -ldflags "$LDFLAGS" -gcflags "$GCFLAGS" -o ./release/${name}_arm$v .
 done
 if $UPX; then upx -9 ./release/${name}_arm*; fi
-	tar -C ./release -zcf ./release/${name}_arm-$VERSION.tar.gz ./${name}_arm*
+tar -C ./release -zcf ./release/${name}_arm-$VERSION.tar.gz $(for v in ${ARMS[@]}; do echo -n "./${name}_arm$v ";done)
 $MD5 ./release/${name}_arm-$VERSION.tar.gz
 
 # MIPS # go 1.8+ required
