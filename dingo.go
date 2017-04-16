@@ -34,6 +34,7 @@ var (
 	opt_proxy    = flag.String("h1:proxy", "", "use Proxy of HTTP or SOCKS5, (Example \"http://127.0.0.1:8080\" or \"socks(5)://127.0.0.1:1080\")")
 	opt_quic     = flag.Bool("quic", false, "use experimental QUIC transport")
 	opt_insecure = flag.Bool("insecure", false, "disable SSL Certificate check")
+	opt_nocache  = flag.Bool("nocache", false, "disable DNS Cache")
 	opt_dbglvl   = flag.Int("dbg", 2, "debugging level")
 )
 
@@ -114,15 +115,20 @@ func handleDNS(w dns.ResponseWriter, req *dns.Msg) {
 	var r Reply
 	cid := fmt.Sprintf("%s/%d", qname, qtype)
 	if x, found := rcache.Get(cid); found {
-		// FIXME: update TTLs
 		r = x.(Reply)
 	} else {
 		/* pass to resolvers and block until the response comes */
 		r = resolve(qname, int(qtype))
 		dbg(8, "got reply: %+v", r)
 
-		/* put to cache for 10 seconds (FIXME: use minimum TTL) */
-		rcache.Set(cid, r, 10*time.Second)
+		if !(*opt_nocache) && len(r.Answer) > 0 {
+			ttl := r.Answer[0].TTL
+			if 0 < ttl && ttl < 30 {
+				ttl = 30
+			}
+			/* put to cache for TTL(>=30) seconds */
+			rcache.Set(cid, r, time.Duration(ttl)*time.Second)
+		}
 	}
 
 	/* rewrite the answers in r into rmsg */

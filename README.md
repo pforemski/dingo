@@ -68,6 +68,8 @@ Usage of dingo-linux-amd64:
     	use Proxy of HTTP or SOCKS5, (Example "http://127.0.0.1:8080" or "socks(5)://127.0.0.1:1080")
   -insecure
     	disable SSL Certificate check
+  -nocache
+    	disable DNS Cache
   -odns:host string
     	OpenDNS: HTTP 'Host' header (real FQDN, encrypted in TLS) (default "api.openresolve.com")
   -odns:server string
