@@ -1,7 +1,7 @@
 FROM alpine:edge
 MAINTAINER CHENHW2 <https://github.com/chenhw2>
 
-ARG DINGO_URL=https://github.com/chenhw2/dingo/releases/download/v20170410/dingo_linux-amd64-20170410.tar.gz
+ARG DINGO_URL=https://github.com/chenhw2/dingo/releases/download/v20170417/dingo_linux-amd64-20170416.tar.gz
 
 RUN apk add --update --no-cache wget supervisor ca-certificates \
     && update-ca-certificates \
