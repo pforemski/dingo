@@ -85,6 +85,35 @@ processes in background. For example, you might want to add the following line t
 screen -dmS dingo /path/to/bin/dingo -port=53 -gdns:server=[2a00:1450:401b:800::200e]
 ```
 
+In macOS, you can use [`launchd`](http://www.launchd.info/). Install `dingo` in `/usr/local/bin`. Login as root `sudo su` (required to listen on 53). Create a service file `/Library/LaunchDaemons/dingo.plist`. Start the service `launchctl load -w /Library/LaunchDaemons/dingo.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+	<dict>
+		<key>Label</key>
+		<string>dingo</string>
+		<key>ProgramArguments</key>
+		<array>
+			<string>/usr/local/bin/dingo</string>
+			<string>-port</string><string>53</string>
+			<string>-gdns:server</string><string>216.58.199.78</string>
+			<string>-gdns:workers</string><string>20</string>
+			<string>-gdns:nopad</string>
+		</array>
+		<key>KeepAlive</key>
+		<true/>
+		<key>StandardOutPath</key>
+		<string>/usr/local/var/log/dingo.log</string>
+		<key>StandardErrorPath</key>
+		<string>/usr/local/var/log/dingo.err</string>
+	</dict>
+</plist>
+```
+
+
+
 ## Author
 
 Pawel Foremski, [pjf@foremski.pl](mailto:pjf@foremski.pl)
