@@ -13,7 +13,6 @@ import "net/url"
 import "time"
 import "encoding/json"
 import "math/rand"
-import "strings"
 import "flag"
 
 type Gdns struct {
@@ -69,6 +68,33 @@ func (R *Gdns) worker(server string) {
 	}
 }
 
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+const (
+	letterIdxBits = 6                    // 6 bits to represent a letter index
+        letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
+	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
+	)
+
+var randsrc = rand.NewSource(time.Now().UnixNano())
+
+func RandStringBytesMaskImprSrc(n int) string {
+    b := make([]byte, n)
+    // A randsrc.Int63() generates 63 random bits, enough for letterIdxMax characters!
+    for i, cache, remain := n-1, randsrc.Int63(), letterIdxMax; i >= 0; {
+        if remain == 0 {
+		cache, remain = randsrc.Int63(), letterIdxMax
+	}
+	if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
+		b[i] = letterBytes[idx]
+		i--
+        }
+        cache >>= letterIdxBits
+        remain--
+    }
+
+    return string(b)
+}
+
 func (R *Gdns) resolve(https *Https, server string, qname string, qtype int) *Reply {
 	r := Reply{ Status: -1 }
 	v := url.Values{}
@@ -80,7 +106,7 @@ func (R *Gdns) resolve(https *Https, server string, qname string, qtype int) *Re
 		v.Set("edns_client_subnet", *R.edns)
 	}
 	if !*R.nopad {
-		v.Set("random_padding", strings.Repeat(string(65+rand.Intn(26)), rand.Intn(500)))
+		v.Set("random_padding", RandStringBytesMaskImprSrc(rand.Intn(500)))
 	}
 
 	/* query */
