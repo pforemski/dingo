@@ -23,6 +23,7 @@ type Gdns struct {
 	sni *string
 	host *string
 	edns *string
+	edns6 *string
 	nopad *bool
 }
 
@@ -40,6 +41,8 @@ func (r *Gdns) Init() {
 		"Google DNS: HTTP 'Host' header (real FQDN, encrypted in TLS)")
 	r.edns    = flag.String("gdns:edns", "",
 		"Google DNS: EDNS client subnet (set 0.0.0.0/0 to disable)")
+	r.edns6    = flag.String("gdns:edns6", "",
+		"Google DNS: Optional IPv6 EDNS client subnet for AAAA queries")
 	r.nopad   = flag.Bool("gdns:nopad", false,
 		"Google DNS: disable random padding")
 }
@@ -76,9 +79,13 @@ func (R *Gdns) resolve(https *Https, server string, qname string, qtype int) *Re
 	/* prepare */
 	v.Set("name", qname)
 	v.Set("type", fmt.Sprintf("%d", qtype))
-	if len(*R.edns) > 0 {
+
+	if (qtype == 28 && len(*R.edns6) > 0) {
+		v.Set("edns_client_subnet", *R.edns6)
+	} else if (len(*R.edns) > 0) {
 		v.Set("edns_client_subnet", *R.edns)
 	}
+	
 	if !*R.nopad {
 		v.Set("random_padding", strings.Repeat(string(65+rand.Intn(26)), rand.Intn(500)))
 	}
