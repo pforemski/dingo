@@ -1,0 +1,15 @@
+[Unit]
+Description=Google Secure DNS resolver
+Wants=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/conf.d/dingo
+ExecStart=/usr/bin/dingo \
+	-dbg ${DINGO_DEBUG} \
+	-bind ${DINGO_LOCALIP} \
+	-port ${DINGO_LOCALPORT}
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target
