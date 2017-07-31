@@ -18,6 +18,7 @@ import "github.com/miekg/dns"
 import "time"
 import "github.com/patrickmn/go-cache"
 import "math/rand"
+import "reflect"
 
 /**********************************************************************/
 
@@ -123,6 +124,9 @@ func handle(buf []byte, addr *net.UDPAddr, uc *net.UDPConn) {
 		rmsg.RecursionAvailable = r.RA
 		rmsg.AuthenticatedData = r.AD
 		rmsg.CheckingDisabled = r.CD
+			
+		// Round Robin DNS https://en.wikipedia.org/wiki/Round-robin_DNS
+		Shuffle(r.Answer)
 
 		for _,grr := range r.Answer { rmsg.Answer = append(rmsg.Answer, getrr(grr)) }
 		for _,grr := range r.Authority { rmsg.Ns = append(rmsg.Ns, getrr(grr)) }
@@ -154,6 +158,16 @@ func resolve(name string, qtype int) Reply {
 	rchan := make(chan Reply, 1)
 	qchan <- Query{name, qtype, &rchan}
 	return <-rchan
+}
+
+func Shuffle(slice interface{}) {
+    rv := reflect.ValueOf(slice)
+    swap := reflect.Swapper(slice)
+    length := rv.Len()
+    for i := length - 1; i > 0; i-- {
+            j := rand.Intn(i + 1)
+            swap(i, j)
+    }
 }
 
 /* main */
