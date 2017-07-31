@@ -68,9 +68,19 @@ func (R *Gdns) worker(server string) {
 		*q.rchan <- *R.resolve(https, server, q.Name, q.Type)
 	}
 }
+
 // To prevent misinterpretation of the URL, restrict the padding characters to the unreserved URL characters: 
 // upper- and lower-case letters, digits, hyphen, period, underscore and tilde. http://stackoverflow.com/a/695469/18829
 const padChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~"
+
+func getPaddedStr(n int) string {
+    s := make([]byte, n)
+    for i := range s {
+        s[i] = padChars[rand.Intn(len(padChars))]
+    }
+    return string(s)
+}
+
 func (R *Gdns) resolve(https *Https, server string, qname string, qtype int) *Reply {
 	r := Reply{ Status: -1 }
 	v := url.Values{}
@@ -100,3 +110,7 @@ func (R *Gdns) resolve(https *Https, server string, qname string, qtype int) *Re
 
 /* register module */
 var _ = register("gdns", new(Gdns))
+
+func initRand() {
+    rand.Seed(time.Now().UnixNano())
+}
