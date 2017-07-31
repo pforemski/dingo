@@ -20,6 +20,7 @@ type Gdns struct {
 	workers *int
 	server *string
 	auto *bool
+	auto6 *bool
 	sni *string
 	host *string
 	edns *string
@@ -34,6 +35,8 @@ func (r *Gdns) Init() {
 		"Google DNS: server address")
 	r.auto   = flag.Bool("gdns:auto", false,
 		"Google DNS: try to lookup the closest IPv4 server")
+	r.auto6   = flag.Bool("gdns:auto6", false,
+		"Google DNS: try to lookup the closest IPv6 server")
 	r.sni     = flag.String("gdns:sni", "www.google.com",
 		"Google DNS: SNI string to send (should match server certificate)")
 	r.host    = flag.String("gdns:host", "dns.google.com",
@@ -54,6 +57,13 @@ func (R *Gdns) Start() {
 		r4 := R.resolve(NewHttps(*R.sni, false), *R.server, "dns.google.com", 1)
 		if r4.Status == 0 && len(r4.Answer) > 0 {
 			R.server = &r4.Answer[0].Data
+		}
+	}
+	if *R.auto6 {
+		dbg(1, "resolving dns.google.com...")
+		r6 := R.resolve(NewHttps(*R.sni, false), *R.server, "dns.google.com", 28)
+		if r6.Status == 0 && len(r6.Answer) > 0 {
+			R.server = &r6.Answer[0].Data
 		}
 	}
 
