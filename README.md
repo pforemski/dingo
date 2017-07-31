@@ -50,6 +50,8 @@ Usage of dingo-linux-amd64:
     	debugging level (default 2)
   -gdns:auto
     	Google DNS: try to lookup the closest IPv4 server
+  -gdns:auto6
+    	Google DNS: try to lookup the closest IPv6 server
   -gdns:edns string
     	Google DNS: EDNS client subnet (set 0.0.0.0/0 to disable)
   -gdns:host string
