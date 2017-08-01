@@ -60,9 +60,8 @@ func NewHttps(sni string, forceh1 bool) *Https {
 		tr = h1
 
 	case *opt_quic:
-		quic := &h2quic.QuicRoundTripper{
-		// TLSClientConfig: tlscfg, // FIXME
-		}
+		quic := new(h2quic.RoundTripper)
+		//		quic.TLSClientConfig = tlscfg // FIXME
 		tr = quic
 
 	default:
