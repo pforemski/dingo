@@ -65,7 +65,7 @@ func (R *Gdns) Start() {
 func (R *Gdns) worker(server string) {
 	var https = NewHttps(*R.sni, false)
 	//Open Worker Connection to be ready for query NOW
-	hreq, err := http.NewRequest("HEAD", "https://"+server+"/", nil)
+	hreq, err := http.NewRequest("HEAD", "https://"+server, nil)
 	hreq.Host = *R.sni // FIXME: doesn't have an effect for QUIC
 	rtt, err := https.client.Transport.RoundTrip(hreq)
 	if err != nil {
