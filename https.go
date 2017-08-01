@@ -24,8 +24,13 @@ func NewHttps(sni string, forceh1 bool) *Https {
 	H := Https{}
 
 	/* TLS setup */
-	tlscfg := new(tls.Config)
-	tlscfg.ServerName = sni
+	tlscfg := &tls.Config{
+		ServerName: sni,
+		//Enforce highest known available Cipher
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305},
+		MinVersion: tls.VersionTLS12,
+	}
 
 	/* HTTP transport */
 	var tr http.RoundTripper
