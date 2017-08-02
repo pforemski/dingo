@@ -126,7 +126,7 @@ func handle(buf []byte, addr *net.UDPAddr, uc *net.UDPConn) {
 		rmsg.CheckingDisabled = r.CD
 			
 		// Round Robin DNS https://en.wikipedia.org/wiki/Round-robin_DNS
-		if((len(r.Answer) >= 2){
+		if len(r.Answer) >= 2 {
 			Shuffle(r.Answer)
 		}
 
