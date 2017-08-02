@@ -64,13 +64,15 @@ func (R *Gdns) Start() {
 
 func (R *Gdns) worker(server string) {
 	var https = NewHttps(*R.sni, false)
-	//Open Worker Connection to be ready for query NOW
-	hreq, err := http.NewRequest("HEAD", "https://"+server, nil)
-	hreq.Host = *R.sni // FIXME: doesn't have an effect for QUIC
-	rtt, err := https.client.Transport.RoundTrip(hreq)
-	if err != nil {
-		dbg(1, "http.NewRequest(): %v", rtt)
-	}
+	go func() {
+		//Open Worker Connection to be ready for query NOW
+		hreq, err := http.NewRequest("HEAD", "https://"+server, nil)
+		hreq.Host = *R.sni // FIXME: doesn't have an effect for QUIC
+		rtt, err := https.client.Transport.RoundTrip(hreq)
+		if err != nil {
+			go dbg(1, "http.NewRequest(): %v", rtt)
+		}
+	}()
 	for q := range qchan {
 		*q.rchan <- *R.resolve(https, server, q.Name, q.Type)
 	}
