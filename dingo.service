@@ -1,0 +1,10 @@
+[Unit]
+Description=Dingo - DNS over HTTPS
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/dingo -port 53 -gdns:auto 
+StandardOutput=null
+
+[Install]
+WantedBy=multi-user.target
