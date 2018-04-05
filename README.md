@@ -2,7 +2,8 @@
 A DNS client (stub resolver) implemented in Go for the [Google
 DNS-over-HTTPS](https://developers.google.com/speed/public-dns/docs/dns-over-https).
 It effectively encrypts all your DNS traffic. It also supports
-[OpenResolve](https://www.openresolve.com/) by OpenDNS.
+[OpenResolve](https://www.openresolve.com/) by OpenDNS and
+[CloudFlare](https://developers.cloudflare.com/1.1.1.1/dns-over-https/request-structure/).
 
 The ultimate goal for the project is to provide a secure, caching DNS client that
 communicates with recursive DNS resolvers over encrypted channels only. For now,

@@ -28,7 +28,7 @@ type Gdns struct {
 
 /* command-line arguments */
 func (r *Gdns) Init() {
-	r.workers = flag.Int("gdns:workers", 10,
+	r.workers = flag.Int("gdns:workers", 0,
 		"Google DNS: number of independent workers")
 	r.server  = flag.String("gdns:server", "216.58.195.78",
 		"Google DNS: server address")
